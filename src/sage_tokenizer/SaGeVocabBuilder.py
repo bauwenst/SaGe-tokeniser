@@ -32,7 +32,7 @@ class SaGeVocabBuilder:
 
     def build_vocab(self, experiment_name: str,
                     initial_vocabulary: TextSource,
-                    corpus: TextSource, k_corpus_examples: int=1_000, corpus_cache: Union[str,Path]=""):
+                    corpus: TextSource, k_corpus_examples: Optional[int]=1_000, corpus_cache: Union[str,Path]="") -> Path:
         """
         :param experiment_name: Prefix for the outputs of this run.
         :param initial_vocabulary: The set of subwords to start from. The subwords are expected to be strings obtained
@@ -45,6 +45,7 @@ class SaGeVocabBuilder:
                                      You can try to invert your
         :param corpus: Either an iterable of strings or a text file. If the latter, every newline starts a new example.
         :param k_corpus_examples: How many k's (thousands) of examples to sample from the corpus.
+                                  If None or 0, the entire corpus is used.
         :param corpus_cache: If an empty string, examples are streamed from the given corpus directly (after shuffling and
                              truncating) and GenSim's slower implementation is used.
                              Else, all used examples from the corpus will be cached into a text file. The file will be
@@ -52,6 +53,8 @@ class SaGeVocabBuilder:
                              under the specific path it points to. This file may be huge, but GenSim runs much faster
                              when it runs on a file rather than a stream.
         """
+        assert k_corpus_examples is None or k_corpus_examples >= 0
+
         init_logger(experiment_name)
         logging.info(f"Start experiment {experiment_name}")
         logging.info(f"Process will use up to {self.workers_number} worker threads.")
@@ -72,7 +75,7 @@ class SaGeVocabBuilder:
         sage_model = SaGeTokenizer(byte_vocab, self.max_len)
 
         logging.info(f"Loading corpus...")
-        partial_corpus = load_corpus(corpus, n_corpus_examples=1000*k_corpus_examples, cache_name_or_path=corpus_cache, seed=self.random_seed)
+        partial_corpus = load_corpus(corpus, n_corpus_examples=1000*k_corpus_examples if k_corpus_examples else None, cache_name_or_path=corpus_cache, seed=self.random_seed)
         logging.info("Starting the training loop")
         vocab_schedule = self.full_vocab_schedule
 
@@ -213,3 +216,5 @@ class SaGeVocabBuilder:
 
             # advance to next smaller size
             i += 1
+
+        return vocab_folder / f"sage_vocab_{vocab_schedule[-1]}.vocab"

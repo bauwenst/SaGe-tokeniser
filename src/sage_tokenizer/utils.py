@@ -97,7 +97,7 @@ def load_vocab(hex_string_source: TextSource) -> List[bytes]:
     return [bytes.fromhex(token) for token in textSourceToIterable(hex_string_source)]
 
 
-def load_corpus(corpus: TextSource, n_corpus_examples: int, cache_name_or_path: Union[str,Path], seed: int) -> Iterable[str]:
+def load_corpus(corpus: TextSource, n_corpus_examples: Optional[int], cache_name_or_path: Union[str,Path], seed: int) -> Iterable[str]:
     if isinstance(cache_name_or_path, Path):
         do_cache = True
         cache_path = cache_name_or_path.with_suffix(".txt")
@@ -107,7 +107,7 @@ def load_corpus(corpus: TextSource, n_corpus_examples: int, cache_name_or_path: 
             if "/" in cache_name_or_path:  # User wants a very specific path, e.g. because he's running on an HPC and has a separate path for storage.
                 cache_path = Path(cache_name_or_path).with_suffix(".txt")
             else:
-                cache_path = getDataFolder() / f"{cache_name_or_path}_{n_corpus_examples}_{seed}.txt"
+                cache_path = getDataFolder() / f"{cache_name_or_path}_{n_corpus_examples if n_corpus_examples else 'full'}_seed{seed}.txt"
         else:
             cache_path = None
 
@@ -122,7 +122,7 @@ def load_corpus(corpus: TextSource, n_corpus_examples: int, cache_name_or_path: 
     corpus = textSourceToIterable(corpus)
     data = IterableDataset.from_generator(lambda: ({"text": s.strip().replace("\n", " ")} for s in corpus))  # It's actually "from_thingThatMakesGenerator", not "from_generator".
     data = data.shuffle(buffer_size=1_000_000, seed=seed)
-    data = data.take(n_corpus_examples)
+    data = data.take(n_corpus_examples) if n_corpus_examples else data
     data = DictIterableAsStringIterable(data)
 
     if do_cache:
