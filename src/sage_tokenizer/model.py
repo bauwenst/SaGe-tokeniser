@@ -1,6 +1,6 @@
 # Copyright © 2023 Kensho Technologies, LLC
 
-from typing import List, Dict, Union, Tuple
+from typing import List, Dict, Union, Tuple, Iterable
 
 import numpy as np
 
@@ -8,11 +8,13 @@ from .HFEncoding import HFEncoding
 
 
 Tokenizable = Union[str,bytes]
+hexstr = str
+ParsableVocabulary = Union[ Iterable[Union[bytes,hexstr]], Dict[Union[bytes,hexstr],int] ]
 
 
 class SaGeTokenizer:
 
-    def __init__(self, initial_vocabulary, max_len: int=16):
+    def __init__(self, initial_vocabulary: ParsableVocabulary, max_len: int=16):
         self.hfe = HFEncoding()
         self.byte_vocab: Dict[bytes, int]     = None
         self.inv_byte_vocab: Dict[int, bytes] = None
@@ -22,33 +24,34 @@ class SaGeTokenizer:
         self.set_vocabulary(initial_vocabulary)
         self.max_len = max_len
 
-    # given an order list of bytes for vocabulary
-    # create our internal structures
-    # overwriting any previous values
-    def set_vocabulary(self, new_vocab: List[bytes]):
-        self.byte_vocab = self.set_bytes_vocab(new_vocab)
-
-        # make sure we always have all single bytes in vocabulary
+    def set_vocabulary(self, new_vocab: ParsableVocabulary):
+        """
+        Given an order list of bytes for the vocabulary, initialise all internal structures
+        overwriting any previous values.
+        """
+        # Set main bytes -> ID map, and make sure we always have all single bytes in vocabulary
+        self.byte_vocab = SaGeTokenizer.parse_vocab(new_vocab)
         verify_all_single_byte_exist_in_vocab(self.byte_vocab)
-
-        # inverted map of inv_byte_vocab (int index : bytes)
+        # Inverted map ID -> bytes
         self.inv_byte_vocab = {v: k for (k, v) in self.byte_vocab.items()}
-
-        # encoded str : int index
-        # convert bytes to our encoded form for keys
+        # HuggingFace-equivalent of bytes -> ID
         self.str_vocab = {self.hfe.to_encoded(k): v for (k, v) in self.byte_vocab.items()}
-        # int index : encoded str
+        # ID -> HuggingFace-equivalent of bytes
         self.inv_str_vocab = {v: k for (k, v) in self.str_vocab.items()}
 
-    @staticmethod
-    def set_bytes_vocab(new_vocab: List[bytes]) -> Dict[bytes, int]:
-        # bytes : int index
-        byte_vocab = {}
-        for idx, token in enumerate(new_vocab):
-            # token should have been converted to bytes
-            assert type(token) == bytes
-            byte_vocab[token] = idx
-        return byte_vocab
+    @classmethod
+    def parse_vocab(cls, raw_vocab: ParsableVocabulary) -> Dict[bytes, int]:
+        if isinstance(raw_vocab, dict):  # IDs have been pre-determined.
+            parsed_vocab = {(bytes.fromhex(t) if isinstance(t, str) else t): i for t,i in raw_vocab.items()}
+        else:
+            parsed_vocab = {(bytes.fromhex(t) if isinstance(t, str) else t): i for i,t in enumerate(raw_vocab)}
+
+        # Runtime type checking
+        for t,i in parsed_vocab.items():
+            assert isinstance(t, bytes)
+            assert isinstance(i, int)
+
+        return parsed_vocab
 
     def id_to_bytes(self, token_id: int) -> bytes:
         return self.inv_byte_vocab[token_id]

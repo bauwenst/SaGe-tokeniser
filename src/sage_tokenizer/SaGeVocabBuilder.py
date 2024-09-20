@@ -43,7 +43,8 @@ class SaGeVocabBuilder:
                                    - If you have them as a set of strings V in some custom pretokenisation space (e.g. with
                                      HuggingFace encoding, with boundary markers, ...), you're out of luck currently.
                                      You can try to invert your
-        :param corpus: Either an iterable of strings or a text file. If the latter, every newline starts a new example.
+        :param corpus: Either an iterable of string examples, or a text file. If the latter, every newline starts a new example.
+                       Note: must NOT be an iteraTOR, i.e. it must be possible to iterate over this multiple times without it being consumed afterwards.
         :param k_corpus_examples: How many k's (thousands) of examples to sample from the corpus.
                                   If None or 0, the entire corpus is used.
         :param corpus_cache: If an empty string, examples are streamed from the given corpus directly (after shuffling and
